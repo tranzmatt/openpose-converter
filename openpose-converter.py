@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # This code from https://github.com/lllyasviel/ControlNet
 
 import os

@@ -17,6 +17,7 @@ import urllib
 import openpose.util as util
 from openpose.model import bodypose_model
 #from openpose
+import json
 
 class Body(object):
     def __init__(self, model_path):
@@ -214,8 +215,38 @@ class Body(object):
         # candidate: x, y, score, id
         return candidate, subset
 
+def get_pose_json(oriImg):
+    height, width, channels = oriImg.shape
+
+    candidate, subset = body_estimation(oriImg)
+
+    if len(candidate) == 0 or len(subset) == 0:
+        print("No poses found in the input image.")
+        return None
+
+    candidate_int = candidate.astype(int)
+    candidate_list = candidate_int[:, :2].tolist()
+
+    data = {
+        "width": width,
+        "height": height,
+        "keypoints": candidate_list
+    }
+    candidate_json = json.dumps(data)
+
+    return candidate_json
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='Body Pose Estimation using OpenPose', add_help=True)
+    parser.add_argument("-i", "--input_image", help="Path to the input image", type=str, required=True)
+    parser.add_argument("-s", "--show_image", help="Display the output image", action="store_true")
+    parser.add_argument("-j", "--json_output", help="Save JSON output to file", action="store_true")
+    args = parser.parse_args()
+
+    if hasattr(args, 'help'):
+        parser.print_help()
+        exit()
 
     script_path = os.path.abspath(__file__)
     script_dir = os.path.dirname(script_path)
@@ -232,19 +263,23 @@ if __name__ == "__main__":
 
     body_estimation = Body(model_path)
 
-    parser = argparse.ArgumentParser(description='Body Pose Estimation using OpenPose')
-    parser.add_argument("-i", "--input_image", help="Path to the input image", type=str, required=True)
-    parser.add_argument("-s", "--show_image", help="Display the output image", action="store_true")
-
-    args = parser.parse_args()
-
     input_image = args.input_image
+
     oriImg = cv2.imread(input_image)  # B,G,R order
+    height, width, channels = oriImg.shape
+
     candidate, subset = body_estimation(oriImg)
 
     if len(candidate) == 0 or len(subset) == 0:
         print("No poses found in the input image.")
         exit()
+
+    if args.json_output:
+        candidate_json = get_pose_json(oriImg)
+        # save JSON output to file
+        output_filename = '.'.join(input_image.split('.')[:-1]) + '.openpose.json'
+        with open(output_filename, 'w') as f:
+            f.write(candidate_json)
 
     canvas = np.zeros_like(oriImg)
     canvas.fill(0)

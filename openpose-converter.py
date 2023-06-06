@@ -236,47 +236,19 @@ def get_pose_json(oriImg):
 
     return candidate_json
 
-if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description='Body Pose Estimation using OpenPose', add_help=True)
-    parser.add_argument("-i", "--input_image", help="Path to the input image", type=str, required=True)
-    parser.add_argument("-s", "--show_image", help="Display the output image", action="store_true")
-    parser.add_argument("-j", "--json_output", help="Save JSON output to file", action="store_true")
-    args = parser.parse_args()
-
-    if hasattr(args, 'help'):
-        parser.print_help()
-        exit()
-
-    script_path = os.path.abspath(__file__)
-    script_dir = os.path.dirname(script_path)
-
-    model_dir = os.path.join(script_dir, "model")
-    os.makedirs(model_dir, exist_ok=True)
-
-    model_path = os.path.join(model_dir, "body_pose_model.pth")
-
-    if not os.path.isfile(model_path):
-        body_model_path = "https://huggingface.co/lllyasviel/ControlNet/resolve/main/annotator/ckpts/body_pose_model.pth"
-        #load_file_from_url(body_model_path, model_dir=model_path)
-        urllib.request.urlretrieve(body_model_path, model_path)
-
-    body_estimation = Body(model_path)
-
-    input_image = args.input_image
-
+def process_image(input_image, body_estimation, args):
     oriImg = cv2.imread(input_image)  # B,G,R order
     height, width, channels = oriImg.shape
 
     candidate, subset = body_estimation(oriImg)
 
     if len(candidate) == 0 or len(subset) == 0:
-        print("No poses found in the input image.")
-        exit()
+        print(f"No poses found in the input image {input_image}.")
+        return
 
     if args.json_output:
         candidate_json = get_pose_json(oriImg)
-        # save JSON output to file
         output_filename = '.'.join(input_image.split('.')[:-1]) + '.openpose.json'
         with open(output_filename, 'w') as f:
             f.write(candidate_json)
@@ -291,3 +263,37 @@ if __name__ == "__main__":
     if args.show_image:
         plt.imshow(canvas[:, :, [2, 1, 0]])
         plt.show()
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='Body Pose Estimation using OpenPose', add_help=True)
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-i", "--input_image", help="Path to the input image", type=str)
+    group.add_argument("-d", "--directory", help="Directory to search for images", type=str)
+    parser.add_argument("-p", "--pattern", help="Pattern to match for images in directory", type=str)
+    parser.add_argument("-s", "--show_image", help="Display the output image", action="store_true")
+    parser.add_argument("-j", "--json_output", help="Save JSON output to file", action="store_true")
+    args = parser.parse_args()
+
+    script_path = os.path.abspath(__file__)
+    script_dir = os.path.dirname(script_path)
+
+    model_dir = os.path.join(script_dir, "model")
+    os.makedirs(model_dir, exist_ok=True)
+
+    model_path = os.path.join(model_dir, "body_pose_model.pth")
+
+    if not os.path.isfile(model_path):
+        body_model_path = "https://huggingface.co/lllyasviel/ControlNet/resolve/main/annotator/ckpts/body_pose_model.pth"
+        urllib.request.urlretrieve(body_model_path, model_path)
+
+    body_estimation = Body(model_path)
+
+    if args.input_image:
+        images = [args.input_image]
+    else:
+        images = glob.glob(os.path.join(args.directory, args.pattern))
+
+    for input_image in images:
+        process_image(input_image, body_estimation, args)
+

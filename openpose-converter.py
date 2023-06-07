@@ -6,26 +6,23 @@ import argparse
 import cv2
 import numpy as np
 import math
-import time
 import glob
 from scipy.ndimage import gaussian_filter
 import matplotlib.pyplot as plt
-import matplotlib
 import torch
-from torchvision import transforms
 
 import urllib
 import openpose.util as util
 from openpose.model import bodypose_model
-#from openpose
 import json
 
+
 class Body(object):
-    def __init__(self, model_path):
+    def __init__(self, the_model_path):
         self.model = bodypose_model()
         if torch.cuda.is_available():
             self.model = self.model.cuda()
-        model_dict = util.transfer(self.model, torch.load(model_path))
+        model_dict = util.transfer(self.model, torch.load(the_model_path))
         self.model.load_state_dict(model_dict)
         self.model.eval()
 
@@ -58,8 +55,9 @@ class Body(object):
             Mconv7_stage6_L2 = Mconv7_stage6_L2.cpu().numpy()
 
             # extract outputs, resize, and remove padding
-            # heatmap = np.transpose(np.squeeze(net.blobs[output_blobs.keys()[1]].data), (1, 2, 0))  # output 1 is heatmaps
-            heatmap = np.transpose(np.squeeze(Mconv7_stage6_L2), (1, 2, 0))  # output 1 is heatmaps
+            # output 1 is heatmaps
+            # heatmap = np.transpose(np.squeeze(net.blobs[output_blobs.keys()[1]].data), (1, 2, 0))
+            heatmap = np.transpose(np.squeeze(Mconv7_stage6_L2), (1, 2, 0))
             heatmap = cv2.resize(heatmap, (0, 0), fx=stride, fy=stride, interpolation=cv2.INTER_CUBIC)
             heatmap = heatmap[:imageToTest_padded.shape[0] - pad[2], :imageToTest_padded.shape[1] - pad[3], :]
             heatmap = cv2.resize(heatmap, (oriImg.shape[1], oriImg.shape[0]), interpolation=cv2.INTER_CUBIC)
@@ -90,7 +88,8 @@ class Body(object):
             map_down[:, :-1] = one_heatmap[:, 1:]
 
             peaks_binary = np.logical_and.reduce(
-                (one_heatmap >= map_left, one_heatmap >= map_right, one_heatmap >= map_up, one_heatmap >= map_down, one_heatmap > threshold1))
+                (one_heatmap >= map_left, one_heatmap >= map_right, one_heatmap >= map_up,
+                 one_heatmap >= map_down, one_heatmap > threshold1))
             peaks = list(zip(np.nonzero(peaks_binary)[1], np.nonzero(peaks_binary)[0]))  # note reverse
             peaks_with_score = [x + (map_ori[x[1], x[0]],) for x in peaks]
             peak_id = range(peak_counter, peak_counter + len(peaks))
@@ -100,12 +99,12 @@ class Body(object):
             peak_counter += len(peaks)
 
         # find connection in the specified sequence, center 29 is in the position 15
-        limbSeq = [[2, 3], [2, 6], [3, 4], [4, 5], [6, 7], [7, 8], [2, 9], [9, 10], \
-                   [10, 11], [2, 12], [12, 13], [13, 14], [2, 1], [1, 15], [15, 17], \
+        limbSeq = [[2, 3], [2, 6], [3, 4], [4, 5], [6, 7], [7, 8], [2, 9], [9, 10],
+                   [10, 11], [2, 12], [12, 13], [13, 14], [2, 1], [1, 15], [15, 17],
                    [1, 16], [16, 18], [3, 17], [6, 18]]
         # the middle joints heatmap correpondence
-        mapIdx = [[31, 32], [39, 40], [33, 34], [35, 36], [41, 42], [43, 44], [19, 20], [21, 22], \
-                  [23, 24], [25, 26], [27, 28], [29, 30], [47, 48], [49, 50], [53, 54], [51, 52], \
+        mapIdx = [[31, 32], [39, 40], [33, 34], [35, 36], [41, 42], [43, 44], [19, 20], [21, 22],
+                  [23, 24], [25, 26], [27, 28], [29, 30], [47, 48], [49, 50], [53, 54], [51, 52],
                   [55, 56], [37, 38], [45, 46]]
 
         connection_all = []
@@ -118,8 +117,8 @@ class Body(object):
             candB = all_peaks[limbSeq[k][1] - 1]
             nA = len(candA)
             nB = len(candB)
-            indexA, indexB = limbSeq[k]
-            if (nA != 0 and nB != 0):
+            # indexA, indexB = limbSeq[k]
+            if nA != 0 and nB != 0:
                 connection_candidate = []
                 for i in range(nA):
                     for j in range(nB):
@@ -128,12 +127,12 @@ class Body(object):
                         norm = max(0.001, norm)
                         vec = np.divide(vec, norm)
 
-                        startend = list(zip(np.linspace(candA[i][0], candB[j][0], num=mid_num), \
+                        startend = list(zip(np.linspace(candA[i][0], candB[j][0], num=mid_num),
                                             np.linspace(candA[i][1], candB[j][1], num=mid_num)))
 
-                        vec_x = np.array([score_mid[int(round(startend[I][1])), int(round(startend[I][0])), 0] \
+                        vec_x = np.array([score_mid[int(round(startend[I][1])), int(round(startend[I][0])), 0]
                                           for I in range(len(startend))])
-                        vec_y = np.array([score_mid[int(round(startend[I][1])), int(round(startend[I][0])), 1] \
+                        vec_y = np.array([score_mid[int(round(startend[I][1])), int(round(startend[I][0])), 1]
                                           for I in range(len(startend))])
 
                         score_midpts = np.multiply(vec_x, vec[0]) + np.multiply(vec_y, vec[1])
@@ -149,9 +148,9 @@ class Body(object):
                 connection = np.zeros((0, 5))
                 for c in range(len(connection_candidate)):
                     i, j, s = connection_candidate[c][0:3]
-                    if (i not in connection[:, 3] and j not in connection[:, 4]):
+                    if i not in connection[:, 3] and j not in connection[:, 4]:
                         connection = np.vstack([connection, [candA[i][3], candB[j][3], s, i, j]])
-                        if (len(connection) >= min(nA, nB)):
+                        if len(connection) >= min(nA, nB):
                             break
 
                 connection_all.append(connection)
@@ -216,6 +215,7 @@ class Body(object):
         # candidate: x, y, score, id
         return candidate, subset
 
+
 def get_pose_json(oriImg):
     height, width, channels = oriImg.shape
 
@@ -238,17 +238,17 @@ def get_pose_json(oriImg):
     return candidate_json
 
 
-def process_image(input_image, body_estimation, args):
-    output_filename = '.'.join(input_image.split('.')[:-1]) + '.openpose.png'
+def process_image(this_input_image, the_body_estimation, these_args):
+    output_filename = '.'.join(this_input_image.split('.')[:-1]) + '.openpose.png'
     if os.path.isfile(output_filename) and not args.force:
-        print(f"Output file {output_filename} already exists, skipping {input_image}")
+        print(f"Output file {output_filename} already exists, skipping {this_input_image}")
         return
 
-    oriImg = cv2.imread(input_image)  # B,G,R order
-    height, width, channels = oriImg.shape
+    oriImg = cv2.imread(this_input_image)  # B,G,R order
+    # height, width, channels = oriImg.shape
 
     try:
-        candidate, subset = body_estimation(oriImg)
+        candidate, subset = the_body_estimation(oriImg)
     except Exception as e:
         print(f"Error processing image {input_image}: {e}")
         return
@@ -257,7 +257,7 @@ def process_image(input_image, body_estimation, args):
         print(f"No poses found in the input image {input_image}.")
         return
 
-    if args.json_output:
+    if these_args.json_output:
         candidate_json = get_pose_json(oriImg)
         output_filename = '.'.join(input_image.split('.')[:-1]) + '.openpose.json'
         with open(output_filename, 'w') as f:
@@ -269,9 +269,10 @@ def process_image(input_image, body_estimation, args):
 
     cv2.imwrite(output_filename, canvas)
 
-    if args.show_image:
+    if these_args.show_image:
         plt.imshow(canvas[:, :, [2, 1, 0]])
         plt.show()
+
 
 if __name__ == "__main__":
 
@@ -280,10 +281,12 @@ if __name__ == "__main__":
     group.add_argument("-i", "--input_image", help="Path to the input image", type=str)
     group.add_argument("-d", "--directory", help="Directory to search for images", type=str)
     parser.add_argument("-p", "--patterns", help="Pattern to match for images in directory", type=str)
-    parser.add_argument("-r", "--recursive", help="Search for files in subdirectories recursively", action="store_true")
+    parser.add_argument("-r", "--recursive", help="Search for files in subdirectories recursively",
+                        action="store_true")
     parser.add_argument("-s", "--show_image", help="Display the output image", action="store_true")
     parser.add_argument("-j", "--json_output", help="Save JSON output to file", action="store_true")
-    parser.add_argument("-f", "--force", help="Force processing of images even if output file already exists", action="store_true")
+    parser.add_argument("-f", "--force", help="Force processing of images even if output file already exists",
+                        action="store_true")
     args = parser.parse_args()
 
     script_path = os.path.abspath(__file__)
@@ -295,7 +298,8 @@ if __name__ == "__main__":
     model_path = os.path.join(model_dir, "body_pose_model.pth")
 
     if not os.path.isfile(model_path):
-        body_model_path = "https://huggingface.co/lllyasviel/ControlNet/resolve/main/annotator/ckpts/body_pose_model.pth"
+        body_model_path = \
+            "https://huggingface.co/lllyasviel/ControlNet/resolve/main/annotator/ckpts/body_pose_model.pth"
         urllib.request.urlretrieve(body_model_path, model_path)
 
     body_estimation = Body(model_path)
@@ -305,6 +309,8 @@ if __name__ == "__main__":
     else:
         patterns = args.patterns.split(',')
         for pattern in patterns:
-            for input_image in glob.iglob(os.path.join(args.directory, '**', pattern) if args.recursive else os.path.join(args.directory, pattern), recursive=args.recursive):
+            for input_image in glob.iglob(os.path.join(args.directory, '**', pattern)
+                                          if args.recursive else os.path.join(args.directory, pattern),
+                                          recursive=args.recursive):
                 print(f"Processing {input_image}")
                 process_image(input_image, body_estimation, args)

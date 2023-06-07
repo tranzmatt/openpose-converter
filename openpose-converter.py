@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 import math
 import time
+import glob
 from scipy.ndimage import gaussian_filter
 import matplotlib.pyplot as plt
 import matplotlib
@@ -238,10 +239,19 @@ def get_pose_json(oriImg):
 
 
 def process_image(input_image, body_estimation, args):
+    output_filename = '.'.join(input_image.split('.')[:-1]) + '.openpose.png'
+    if os.path.isfile(output_filename) and not args.force:
+        print(f"Output file {output_filename} already exists, skipping {input_image}")
+        return
+
     oriImg = cv2.imread(input_image)  # B,G,R order
     height, width, channels = oriImg.shape
 
-    candidate, subset = body_estimation(oriImg)
+    try:
+        candidate, subset = body_estimation(oriImg)
+    except Exception as e:
+        print(f"Error processing image {input_image}: {e}")
+        return
 
     if len(candidate) == 0 or len(subset) == 0:
         print(f"No poses found in the input image {input_image}.")
@@ -257,7 +267,6 @@ def process_image(input_image, body_estimation, args):
     canvas.fill(0)
     canvas = util.draw_bodypose(canvas, candidate, subset)
 
-    output_filename = '.'.join(input_image.split('.')[:-1]) + '.openpose.png'
     cv2.imwrite(output_filename, canvas)
 
     if args.show_image:
@@ -270,9 +279,11 @@ if __name__ == "__main__":
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-i", "--input_image", help="Path to the input image", type=str)
     group.add_argument("-d", "--directory", help="Directory to search for images", type=str)
-    parser.add_argument("-p", "--pattern", help="Pattern to match for images in directory", type=str)
+    parser.add_argument("-p", "--patterns", help="Pattern to match for images in directory", type=str)
+    parser.add_argument("-r", "--recursive", help="Search for files in subdirectories recursively", action="store_true")
     parser.add_argument("-s", "--show_image", help="Display the output image", action="store_true")
     parser.add_argument("-j", "--json_output", help="Save JSON output to file", action="store_true")
+    parser.add_argument("-f", "--force", help="Force processing of images even if output file already exists", action="store_true")
     args = parser.parse_args()
 
     script_path = os.path.abspath(__file__)
@@ -292,8 +303,8 @@ if __name__ == "__main__":
     if args.input_image:
         images = [args.input_image]
     else:
-        images = glob.glob(os.path.join(args.directory, args.pattern))
-
-    for input_image in images:
-        process_image(input_image, body_estimation, args)
-
+        patterns = args.patterns.split(',')
+        for pattern in patterns:
+            for input_image in glob.iglob(os.path.join(args.directory, '**', pattern) if args.recursive else os.path.join(args.directory, pattern), recursive=args.recursive):
+                print(f"Processing {input_image}")
+                process_image(input_image, body_estimation, args)

@@ -26,7 +26,7 @@ class Body(object):
         self.model.load_state_dict(model_dict)
         self.model.eval()
 
-    def __call__(self, oriImg):
+    def __call__(self, ori_img):
         # scale_search = [0.5, 1.0, 1.5, 2.0]
         scale_search = [0.5]
         boxsize = 368
@@ -34,13 +34,13 @@ class Body(object):
         padValue = 128
         threshold1 = 0.1
         threshold2 = 0.05
-        multiplier = [x * boxsize / oriImg.shape[0] for x in scale_search]
-        heatmap_avg = np.zeros((oriImg.shape[0], oriImg.shape[1], 19))
-        paf_avg = np.zeros((oriImg.shape[0], oriImg.shape[1], 38))
+        multiplier = [x * boxsize / ori_img.shape[0] for x in scale_search]
+        heatmap_avg = np.zeros((ori_img.shape[0], ori_img.shape[1], 19))
+        paf_avg = np.zeros((ori_img.shape[0], ori_img.shape[1], 38))
 
         for m in range(len(multiplier)):
             scale = multiplier[m]
-            imageToTest = cv2.resize(oriImg, (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+            imageToTest = cv2.resize(ori_img, (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
             imageToTest_padded, pad = util.padRightDownCorner(imageToTest, stride, padValue)
             im = np.transpose(np.float32(imageToTest_padded[:, :, :, np.newaxis]), (3, 2, 0, 1)) / 256 - 0.5
             im = np.ascontiguousarray(im)
@@ -60,13 +60,13 @@ class Body(object):
             heatmap = np.transpose(np.squeeze(Mconv7_stage6_L2), (1, 2, 0))
             heatmap = cv2.resize(heatmap, (0, 0), fx=stride, fy=stride, interpolation=cv2.INTER_CUBIC)
             heatmap = heatmap[:imageToTest_padded.shape[0] - pad[2], :imageToTest_padded.shape[1] - pad[3], :]
-            heatmap = cv2.resize(heatmap, (oriImg.shape[1], oriImg.shape[0]), interpolation=cv2.INTER_CUBIC)
+            heatmap = cv2.resize(heatmap, (ori_img.shape[1], ori_img.shape[0]), interpolation=cv2.INTER_CUBIC)
 
             # paf = np.transpose(np.squeeze(net.blobs[output_blobs.keys()[0]].data), (1, 2, 0))  # output 0 is PAFs
             paf = np.transpose(np.squeeze(Mconv7_stage6_L1), (1, 2, 0))  # output 0 is PAFs
             paf = cv2.resize(paf, (0, 0), fx=stride, fy=stride, interpolation=cv2.INTER_CUBIC)
             paf = paf[:imageToTest_padded.shape[0] - pad[2], :imageToTest_padded.shape[1] - pad[3], :]
-            paf = cv2.resize(paf, (oriImg.shape[1], oriImg.shape[0]), interpolation=cv2.INTER_CUBIC)
+            paf = cv2.resize(paf, (ori_img.shape[1], ori_img.shape[0]), interpolation=cv2.INTER_CUBIC)
 
             heatmap_avg += heatmap_avg + heatmap / len(multiplier)
             paf_avg += + paf / len(multiplier)
@@ -102,7 +102,7 @@ class Body(object):
         limbSeq = [[2, 3], [2, 6], [3, 4], [4, 5], [6, 7], [7, 8], [2, 9], [9, 10],
                    [10, 11], [2, 12], [12, 13], [13, 14], [2, 1], [1, 15], [15, 17],
                    [1, 16], [16, 18], [3, 17], [6, 18]]
-        # the middle joints heatmap correpondence
+        # the middle joints heatmap correspondence
         mapIdx = [[31, 32], [39, 40], [33, 34], [35, 36], [41, 42], [43, 44], [19, 20], [21, 22],
                   [23, 24], [25, 26], [27, 28], [29, 30], [47, 48], [49, 50], [53, 54], [51, 52],
                   [55, 56], [37, 38], [45, 46]]
@@ -130,14 +130,14 @@ class Body(object):
                         startend = list(zip(np.linspace(candA[i][0], candB[j][0], num=mid_num),
                                             np.linspace(candA[i][1], candB[j][1], num=mid_num)))
 
-                        vec_x = np.array([score_mid[int(round(startend[I][1])), int(round(startend[I][0])), 0]
-                                          for I in range(len(startend))])
-                        vec_y = np.array([score_mid[int(round(startend[I][1])), int(round(startend[I][0])), 1]
-                                          for I in range(len(startend))])
+                        vec_x = np.array([score_mid[int(round(startend[index][1])), int(round(startend[index][0])), 0]
+                                          for index in range(len(startend))])
+                        vec_y = np.array([score_mid[int(round(startend[index][1])), int(round(startend[index][0])), 1]
+                                          for index in range(len(startend))])
 
                         score_midpts = np.multiply(vec_x, vec[0]) + np.multiply(vec_y, vec[1])
                         score_with_dist_prior = sum(score_midpts) / len(score_midpts) + min(
-                            0.5 * oriImg.shape[0] / norm - 1, 0)
+                            0.5 * ori_img.shape[0] / norm - 1, 0)
                         criterion1 = len(np.nonzero(score_midpts > threshold2)[0]) > 0.8 * len(score_midpts)
                         criterion2 = score_with_dist_prior > 0
                         if criterion1 and criterion2:
@@ -196,7 +196,7 @@ class Body(object):
                             subset[j1][-1] += 1
                             subset[j1][-2] += candidate[partBs[i].astype(int), 2] + connection_all[k][i][2]
 
-                    # if find no partA in the subset, create a new subset
+                    # if no partA is found in the subset, create a new subset
                     elif not found and k < 17:
                         row = -1 * np.ones(20)
                         row[indexA] = partAs[i]
@@ -216,10 +216,10 @@ class Body(object):
         return candidate, subset
 
 
-def get_pose_json(oriImg):
-    height, width, channels = oriImg.shape
+def get_pose_json(ori_img):
+    height, width, channels = ori_img.shape
 
-    candidate, subset = body_estimation(oriImg)
+    candidate, subset = body_estimation(ori_img)
 
     if len(candidate) == 0 or len(subset) == 0:
         print("No poses found in the input image.")
@@ -244,11 +244,11 @@ def process_image(this_input_image, the_body_estimation, these_args):
         print(f"Output file {output_filename} already exists, skipping {this_input_image}")
         return
 
-    oriImg = cv2.imread(this_input_image)  # B,G,R order
-    # height, width, channels = oriImg.shape
+    ori_img = cv2.imread(this_input_image)  # B,G,R order
+    # height, width, channels = ori_img.shape
 
     try:
-        candidate, subset = the_body_estimation(oriImg)
+        candidate, subset = the_body_estimation(ori_img)
     except Exception as e:
         print(f"Error processing image {input_image}: {e}")
         return
@@ -258,12 +258,12 @@ def process_image(this_input_image, the_body_estimation, these_args):
         return
 
     if these_args.json_output:
-        candidate_json = get_pose_json(oriImg)
+        candidate_json = get_pose_json(ori_img)
         output_filename = '.'.join(input_image.split('.')[:-1]) + '.openpose.json'
         with open(output_filename, 'w') as f:
             f.write(candidate_json)
 
-    canvas = np.zeros_like(oriImg)
+    canvas = np.zeros_like(ori_img)
     canvas.fill(0)
     canvas = util.draw_bodypose(canvas, candidate, subset)
 

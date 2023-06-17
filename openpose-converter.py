@@ -239,9 +239,11 @@ def get_pose_json(ori_img):
 
 
 def process_image(this_input_image, the_body_estimation, these_args):
-    output_filename = '.'.join(this_input_image.split('.')[:-1]) + '.openpose.png'
-    if os.path.isfile(output_filename) and not args.force:
-        print(f"Output file {output_filename} already exists, skipping {this_input_image}")
+    output_png_filename = '.'.join(this_input_image.split('.')[:-1]) + '.openpose.png'
+    output_json_filename = '.'.join(this_input_image.split('.')[:-1]) + '.openpose.json'
+
+    if os.path.isfile(output_png_filename) and not args.force:
+        print(f"Output file {output_png_filename} already exists, skipping {this_input_image}")
         return
 
     ori_img = cv2.imread(this_input_image)  # B,G,R order
@@ -257,17 +259,16 @@ def process_image(this_input_image, the_body_estimation, these_args):
         print(f"No poses found in the input image {input_image}.")
         return
 
-    if these_args.json_output:
-        candidate_json = get_pose_json(ori_img)
-        output_filename = '.'.join(input_image.split('.')[:-1]) + '.openpose.json'
-        with open(output_filename, 'w') as f:
-            f.write(candidate_json)
-
     canvas = np.zeros_like(ori_img)
     canvas.fill(0)
     canvas = util.draw_bodypose(canvas, candidate, subset)
 
-    cv2.imwrite(output_filename, canvas)
+    cv2.imwrite(output_png_filename, canvas)
+
+    if these_args.json_output:
+        candidate_json = get_pose_json(ori_img)
+        with open(output_json_filename, 'w') as f:
+            f.write(candidate_json)
 
     if these_args.show_image:
         plt.imshow(canvas[:, :, [2, 1, 0]])

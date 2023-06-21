@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 
-import cv2
+from rembg import remove
 import numpy as np
 from PIL import Image
 import glob
 import os
 import argparse
+import io
 
 def crop_and_resize(image_path, output_dir, size=768):
     # Construct new file name
     base_name, ext = os.path.splitext(os.path.basename(image_path))
-    new_file_name = f"{base_name}.cr{size}{ext.lower()}"
+    new_file_name = f"{base_name}.cr{size}.png" # The output will be in PNG format to maintain transparency
 
     output_path = os.path.join(output_dir, new_file_name)
 
@@ -19,47 +20,34 @@ def crop_and_resize(image_path, output_dir, size=768):
         return
 
     # Load image
-    img = cv2.imread(image_path)
+    with open(image_path, 'rb') as img_file:
+        img = img_file.read()
 
-    # Set up the initial bounding rectangle
-    rect = (50, 50, 450, 290)
+    # Remove background
+    img_no_bg_bytes = remove(img)
 
-    # Create a mask similar to the input image
-    mask = np.zeros(img.shape[:2], np.uint8)
+    # Convert to PIL Image
+    img_no_bg = Image.open(io.BytesIO(img_no_bg_bytes))
 
-    # Create 2 arrays for the GrabCut algorithm
-    bgdModel = np.zeros((1, 65), np.float64)
-    fgdModel = np.zeros((1, 65), np.float64)
+    # Find non-transparent pixels
+    non_transparent = np.array(img_no_bg)[:, :, :3].any(-1)
 
-    # Apply GrabCut algorithm with 5 iterations
-    cv2.grabCut(img, mask, rect, bgdModel, fgdModel, 5, cv2.GC_INIT_WITH_RECT)
+    # Get the bounding box
+    non_zero_columns = np.where(non_transparent.max(axis=0))[0]
+    non_zero_rows = np.where(non_transparent.max(axis=1))[0]
+    cropBox = (min(non_zero_rows), max(non_zero_rows), min(non_zero_columns), max(non_zero_columns))
 
-    # Apply mask to isolate object
-    mask2 = np.where((mask == 2) | (mask == 0), 0, 1).astype('uint8')
-
-    # Multiply per-element mask with the original image so that non-ROI is discarded
-    img = img * mask2[:, :, np.newaxis]
-
-    # Find contour for the non-zero regions of the mask
-    contours, _ = cv2.findContours(mask2, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    # Assuming there's only one contour of interest, get its bounding rectangle
-    x, y, w, h = cv2.boundingRect(contours[0])
-
-    # Crop the image to the bounding rectangle
-    cropped = img[y: y + h, x: x + w]
-
-    # Convert image from OpenCV to PIL format for easier resizing
-    cropped_pil = Image.fromarray(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
+    # Crop the image to this bounding box
+    cropped = img_no_bg.crop(cropBox)
 
     # Get the larger dimension
-    max_dim = max(cropped_pil.size)
+    max_dim = max(cropped.size)
 
     # Compute new dimensions keeping aspect ratio
-    new_dims = (size, int(cropped_pil.size[1] * size / max_dim)) if cropped_pil.size[0] > cropped_pil.size[1] else (int(cropped_pil.size[0] * size / max_dim), size)
+    new_dims = (size, int(cropped.size[1] * size / max_dim)) if cropped.size[0] > cropped.size[1] else (int(cropped.size[0] * size / max_dim), size)
 
     # Resize image
-    resized = cropped_pil.resize(new_dims, Image.ANTIALIAS)
+    resized = cropped.resize(new_dims, Image.LANCZOS)
 
     # Save image
     resized.save(output_path)

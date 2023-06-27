@@ -36,10 +36,13 @@ def resize_image(file, suffix, output_folder):
         width = int(height * aspect_ratio)
     else:
         height = int(width / aspect_ratio)
+
     resized_image = cv2.resize(image, (width, height), interpolation=cv2.INTER_AREA)
 
     # Save the resized image
-    cv2.imwrite(resized_image, os.path.join(directory, output_folder, f"{base}.{suffix}{extension}"))
+    output_file_path = os.path.join(directory, output_folder, f"{base}.{suffix}{extension}")
+    print(f"Saving to {output_file_path}")
+    cv2.imwrite(output_file_path, resized_image)
 
 # Function to recursively search for image files in subfolders
 def search_and_resize(folder, output_folder):

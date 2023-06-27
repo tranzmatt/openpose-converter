@@ -290,6 +290,11 @@ if __name__ == "__main__":
                         action="store_true")
     args = parser.parse_args()
 
+    # Print help and quit if -h or --help is provided
+    if args.input_image is None and args.directory is None:
+        parser.print_help()
+        exit()
+
     script_path = os.path.abspath(__file__)
     script_dir = os.path.dirname(script_path)
 

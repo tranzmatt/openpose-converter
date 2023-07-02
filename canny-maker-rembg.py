@@ -3,7 +3,8 @@ import cv2
 import os
 import sys
 import fnmatch
-import rembg
+from rembg import remove
+import numpy as np
 
 # set the default image pattern
 image_pattern = "*.768.jpg"
@@ -23,16 +24,18 @@ def process_files(directory):
             if fnmatch.fnmatchcase(file_lower, image_pattern_lower):
                 image_file = entry.path
                 print(f"Processing {image_file}")
+                filename, ext = os.path.splitext(image_file)
 
                 # read the input image
-                image = cv2.imread(image_file)
+                input_image = cv2.imread(image_file)
 
                 # isolate the foreground using rembg
-                with rembg.open(image) as f:
-                    image_alpha = f.read()
+                output_image = remove(input_image)
+                rembg_output_filename = f"{filename}.rembg.png"
+                cv2.imwrite(rembg_output_filename, output_image)
 
                 # convert to grayscale
-                gray = cv2.cvtColor(image_alpha, cv2.COLOR_RGBA2GRAY)
+                gray = cv2.cvtColor(output_image, cv2.COLOR_BGR2GRAY)
 
                 # set the low and high thresholds
                 low_threshold = 50
@@ -48,17 +51,14 @@ def process_files(directory):
                 _, threshold_output = cv2.threshold(canny_output, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
 
                 # construct the output filenames with the appropriate suffixes
-                filename, ext = os.path.splitext(image_file)
                 canny_output_filename = f"{filename}.rembg.canny_{low_threshold}_{high_threshold}.png"
                 threshold_output_filename = f"{filename}.rembg.threshold.png"
                 inverted_output_filename = f"{filename}.rembg.threshold_inverted.png"
-                rembg_output_filename = f"{filename}.rembg.png"
 
                 # save the output images
                 cv2.imwrite(canny_output_filename, canny_output)
                 cv2.imwrite(threshold_output_filename, threshold_output)
                 cv2.imwrite(inverted_output_filename, inverted_output)
-                cv2.imwrite(rembg_output_filename, image_alpha)
         elif entry.is_dir():
             process_files(entry.path)  # recurse into subdirectories
 

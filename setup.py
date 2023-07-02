@@ -34,7 +34,7 @@ setup(
     version='0.0.1',
     packages=find_packages(),
     package_data={'openpose': ['*']},
-    scripts=['canny-maker-recursive.py', 'openpose-converter.py', 'resize768.py', 'cropAndResize768.py', 'cropAndResizeFixed768.py' ],
+    scripts=['canny-maker-recursive.py', 'canny-maker-rembg.py', 'openpose-converter.py', 'resize768.py', 'cropAndResize768.py', 'cropAndResizeFixed768.py' ],
     install_requires=[],
     cmdclass={
         'install': CustomInstallCommand,

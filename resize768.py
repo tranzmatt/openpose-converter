@@ -29,15 +29,20 @@ def resize_image(file, suffix, output_folder):
     image = cv2.imread(file)
 
     # Resize the image while maintaining aspect ratio
-    width = 768
-    height = 768
-    aspect_ratio = image.shape[1] / image.shape[0]
-    if aspect_ratio > 1:
-        width = int(height * aspect_ratio)
-    else:
-        height = int(width / aspect_ratio)
+    max_size = 768
 
-    resized_image = cv2.resize(image, (width, height), interpolation=cv2.INTER_AREA)
+    # Determine the aspect ratio
+    original_height, original_width = image.shape[:2]
+    if original_width > original_height: # landscape mode
+        aspect_ratio = original_width / original_height
+        new_width = max_size
+        new_height = int(new_width / aspect_ratio)
+    else: # portrait mode or square
+        aspect_ratio = original_height / original_width
+        new_height = max_size
+        new_width = int(new_height / aspect_ratio)
+
+    resized_image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
 
     # Save the resized image
     output_file_path = os.path.join(directory, output_folder, f"{base}.{suffix}{extension}")

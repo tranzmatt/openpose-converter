@@ -9,6 +9,7 @@ import glob
 from multiprocessing import Pool
 import torch
 import cv2
+
 try:
     import kornia as K
     from kornia.core import Tensor
@@ -16,7 +17,7 @@ except ImportError:
     raise ImportError("Please install the kornia library via pip: pip install kornia")
 
 
-def edge_detection(filepath, detectors):
+def edge_detection(filepath, detectors, canny_params):
     """
     Function to perform edge detection on an image file with given detectors.
     """
@@ -61,12 +62,29 @@ def edge_detection(filepath, detectors):
             x_laplacian = K.filters.laplacian(x_gray, kernel_size=5)
             output = K.utils.tensor_to_image(1. - x_laplacian.clamp(0., 1.))
 
-        elif detector == 'canny':
-            x_canny = K.filters.canny(x_gray)[0]
-            output = K.utils.tensor_to_image(1. - x_canny.clamp(0., 1.0))
+        elif detector in ['canny', 'icanny']:
+            low_threshold = canny_params["low_threshold"] / 255.0 if canny_params["low_threshold"] else 0.0
+            high_threshold = canny_params["high_threshold"] / 255.0 if canny_params["high_threshold"] else 1.0
+            sigma = (canny_params["sigma"], canny_params["sigma"])
 
-        output_filepath = filepath.rsplit('.', 1)[0] + '_' + detector + '.' + filepath.rsplit('.', 1)[1]
-        #output.save(output_filepath)
+            x_canny = K.filters.canny(
+                x_gray,
+                low_threshold=low_threshold,
+                high_threshold=high_threshold,
+                kernel_size=(canny_params["kernel_size"], canny_params["kernel_size"]),
+                sigma=sigma,
+                hysteresis=canny_params["hysteresis"],
+                eps=canny_params["eps"]
+            )[0]
+
+            output = K.utils.tensor_to_image(1. - x_canny.clamp(0., 1.0)) if detector == 'canny' else K.utils.tensor_to_image(x_canny.clamp(0., 1.0))
+
+        output_filepath = filepath.rsplit('.', 1)[0] + '.' + detector + '.' + filepath.rsplit('.', 1)[1]
+        output = output.astype('float32')  # Make sure the output is float for the calculations
+        output = output - output.min()  # shift values to be >= 0
+        output = output / output.max()  # normalize to range [0, 1]
+        output = (output * 255).astype('uint8')  # scale to [0, 255]
+        
         cv2.imwrite(output_filepath, cv2.cvtColor(output, cv2.COLOR_RGB2BGR))
 
 
@@ -82,7 +100,7 @@ def split_string(s):
     """
     Helper function to split input string into list by commas and check the inputs are valid.
     """
-    valid_choices = ["dx", "dy", "d2x", "d2y", "sobel", "laplacian", "canny"]
+    valid_choices = ["dx", "dy", "d2x", "d2y", "sobel", "laplacian", "canny", "icanny"]
     input_list = s.split(',')
     
     # Check that each input is a valid choice
@@ -102,16 +120,31 @@ def main():
     group.add_argument('-r', '--recursive', help='Recursive file search with file filter, e.g., "*.jpg".')
     parser.add_argument('-d', '--detectors', required=True, help='Edge detectors to use (comma-separated).',
                         type=split_string)  # Remove choices parameter here
+    parser.add_argument('-l', '--low_threshold', type=float, default=100, help='Low threshold for Canny detector.')
+    parser.add_argument('-u', '--high_threshold', type=float, default=200, help='High threshold for Canny detector.')
+    parser.add_argument('-k', '--kernel_size', type=int, default=5, help='Kernel size for Canny detector.')
+    parser.add_argument('-s', '--sigma', type=float, default=1.0, help='Sigma for Canny detector.')
+    parser.add_argument('-y', '--hysteresis', type=bool, default=True, help='Hysteresis for Canny detector.')
+    parser.add_argument('-e', '--eps', type=float, default=1e-6, help='Epsilon for Canny detector.')
     args = parser.parse_args()
 
+    canny_params = {
+        "low_threshold": args.low_threshold,
+        "high_threshold": args.high_threshold,
+        "kernel_size": args.kernel_size,
+        "sigma": args.sigma,
+        "hysteresis": args.hysteresis,
+        "eps": args.eps
+    }
+
     if args.image:
-        edge_detection(args.image, args.detectors)
+        edge_detection(args.image, args.detectors, canny_params)
     elif args.recursive:
         file_filter = os.path.join(os.getcwd(), '**', args.recursive)
         filepaths = glob.glob(file_filter, recursive=True)
 
         with Pool() as pool:
-            pool.map(process_file, [(filepath, args.detectors) for filepath in filepaths])
+            pool.map(process_file, [(filepath, args.detectors, canny_params) for filepath in filepaths])
 
 if __name__ == '__main__':
     main()

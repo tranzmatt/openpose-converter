@@ -63,19 +63,44 @@ def edge_detection(filepath, detectors, canny_params):
             output = K.utils.tensor_to_image(1. - x_laplacian.clamp(0., 1.))
 
         elif detector in ['canny', 'icanny']:
-            low_threshold = canny_params["low_threshold"] / 255.0 if canny_params["low_threshold"] else 0.0
-            high_threshold = canny_params["high_threshold"] / 255.0 if canny_params["high_threshold"] else 1.0
-            sigma = (canny_params["sigma"], canny_params["sigma"])
+            low_threshold = canny_params.get("low_threshold", 0) / 255.0
+            high_threshold = canny_params.get("high_threshold", 255) / 255.0
+
+            if not 0 <= low_threshold <= 1:
+                raise ValueError(f'Invalid low threshold: {low_threshold}. Should be in range [0, 1].')
+            if not 0 <= high_threshold <= 1:
+                raise ValueError(f'Invalid high threshold: {high_threshold}. Should be in range [0, 1].')
+            if low_threshold > high_threshold:
+                raise ValueError(f'Low threshold: {low_threshold} is higher than high threshold: {high_threshold}.')
+
+            sigma = canny_params.get("sigma", 1)
+            if not isinstance(sigma, (int, float)) or sigma <= 0:
+                raise ValueError(f'Invalid sigma: {sigma}. Should be a positive number.')
+            sigma = (sigma, sigma)
+
+            kernel_size = canny_params.get("kernel_size", 5)
+            if not isinstance(kernel_size, int) or kernel_size <= 0:
+                raise ValueError(f'Invalid kernel size: {kernel_size}. Should be a positive integer.')
+            kernel_size = (kernel_size, kernel_size)
+
+            hysteresis = canny_params.get("hysteresis", True)
+            if not isinstance(hysteresis, bool):
+                raise ValueError(f'Invalid hysteresis: {hysteresis}. Should be a boolean.')
+
+            eps = canny_params.get("eps", 1e-6)
+            if not isinstance(eps, (int, float)) or eps <= 0:
+                raise ValueError(f'Invalid eps: {eps}. Should be a positive number.')
 
             x_canny = K.filters.canny(
                 x_gray,
                 low_threshold=low_threshold,
                 high_threshold=high_threshold,
-                kernel_size=(canny_params["kernel_size"], canny_params["kernel_size"]),
+                kernel_size=kernel_size,
                 sigma=sigma,
-                hysteresis=canny_params["hysteresis"],
-                eps=canny_params["eps"]
+                hysteresis=hysteresis,
+                eps=eps
             )[0]
+
 
             output = K.utils.tensor_to_image(1. - x_canny.clamp(0., 1.0)) if detector == 'canny' else K.utils.tensor_to_image(x_canny.clamp(0., 1.0))
 

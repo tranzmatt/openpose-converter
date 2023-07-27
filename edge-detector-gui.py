@@ -10,30 +10,34 @@ def edge_detection(filepath, detector, low_threshold=0, high_threshold=255, sigm
     if detector == '1st order derivates in x':
         grads: Tensor = K.filters.spatial_gradient(x_gray, order=1)
         grads_x = grads[:, :, 0]
-        output = K.utils.tensor_to_image(1. - grads_x.clamp(0., 1.))
+        output = K.utils.tensor_to_image(grads_x.clamp(0., 1.))
 
     elif detector == '1st order derivates in y':
         grads: Tensor = K.filters.spatial_gradient(x_gray, order=1)
         grads_y = grads[:, :, 1]
-        output = K.utils.tensor_to_image(1. - grads_y.clamp(0., 1.))
+        output = K.utils.tensor_to_image(grads_y.clamp(0., 1.))
 
     elif detector == '2nd order derivatives in x':
         grads: Tensor = K.filters.spatial_gradient(x_gray, order=2)
         grads_x = grads[:, :, 0]
-        output = K.utils.tensor_to_image(1. - grads_x.clamp(0., 1.))
+        output = K.utils.tensor_to_image(grads_x.clamp(0., 1.))
 
     elif detector == '2nd order derivatives in y':
         grads: Tensor = K.filters.spatial_gradient(x_gray, order=2)
         grads_y = grads[:, :, 1]
-        output = K.utils.tensor_to_image(1. - grads_y.clamp(0., 1.))
+        output = K.utils.tensor_to_image(grads_y.clamp(0., 1.))
 
     elif detector == 'Sobel':
+
+        if blur_sigma > 0:
+            x_gray = K.filters.gaussian_blur2d(x_gray, (kernel_size, kernel_size), (blur_sigma, blur_sigma))
+
         x_sobel: Tensor = K.filters.sobel(x_gray)
-        output = K.utils.tensor_to_image(1. - x_sobel)
+        output = K.utils.tensor_to_image(x_sobel)
 
     elif detector == 'Laplacian':
         x_laplacian: Tensor = K.filters.laplacian(x_gray, kernel_size=5)
-        output = K.utils.tensor_to_image(1. - x_laplacian.clamp(0., 1.))
+        output = K.utils.tensor_to_image(x_laplacian.clamp(0., 1.))
 
     elif detector == 'Canny' or detector == 'iCanny':
         low_threshold /= 255.0

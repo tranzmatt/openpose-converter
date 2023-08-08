@@ -1,3 +1,6 @@
 [submodule "openpose"]
 	path = openpose
 	url = https://github.com/tranzmatt/openpose-library.git
+[submodule "ControlNet"]
+	path = ControlNet
+	url = git@github.com:tranzmatt/ControlNet-standalone.git

@@ -2,6 +2,7 @@
 # This code from https://github.com/lllyasviel/ControlNet
 
 import os
+import sys
 import argparse
 import cv2
 import numpy as np
@@ -14,7 +15,11 @@ import torch
 import urllib
 import json
 
-import ControlNet.annotator.util as util
+script_dir = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(script_dir)
+sys.path.append(os.path.join(script_dir, 'ControlNet'))
+
+import ControlNet.annotator.openpose.util as util
 from ControlNet.annotator.openpose.body import Body
 from ControlNet.annotator.openpose.hand import Hand
 
@@ -42,6 +47,7 @@ def get_pose_json(ori_img):
 
 
 def process_image(this_input_image, the_body_estimation, the_hand_estimation, these_args):
+    print(f"Examining {this_input_image}")
     output_png_filename = '.'.join(this_input_image.split('.')[:-1]) + '.openpose.png'
     output_json_filename = '.'.join(this_input_image.split('.')[:-1]) + '.openpose.json'
 
@@ -50,28 +56,29 @@ def process_image(this_input_image, the_body_estimation, the_hand_estimation, th
         return
 
     ori_img = cv2.imread(this_input_image)  # B,G,R order
-    # height, width, channels = ori_img.shape
-
-    try:
-        body_candidate, body_subset = the_body_estimation(ori_img)
-    except Exception as e:
-        print(f"Error processing image {input_image}: {e}")
-        return
-
-    if len(body_candidate) == 0 or len(body_subset) == 0:
-        print(f"No poses found in the input image {input_image}.")
-        return
-
-    try:
-        hand_candidate, hand_subset = the_hand_estimation(ori_img)
-    except Exception as e:
-        print(f"Error processing image {input_image}: {e}")
-        return
 
     canvas = np.zeros_like(ori_img)
     canvas.fill(0)
-    canvas = util.draw_bodypose(canvas, body_candidate, body_subset)
-    canvas = util.draw_bodypose(canvas, hand_candidate, hand_subset)
+
+    try:
+        print(f"Estimating Body")
+        body_candidate, body_subset = the_body_estimation(ori_img)
+        if len(body_candidate) == 0 or len(body_subset) == 0:
+            print(f"No poses found in the input image {this_input_image}.")
+            return
+        canvas = util.draw_bodypose(canvas, body_candidate, body_subset)
+    except Exception as e:
+        print(f"Error processing image body {this_input_image}: {e}")
+        return
+
+    try:
+        peaks = the_hand_estimation(ori_img)
+        print(f"Estimating Hand {peaks}")
+        if peaks is not None:
+            canvas = util.draw_handpose(canvas, peaks)
+    except Exception as e:
+        print(f"Error processing image hand {this_input_image}: {e}")
+        return
 
     cv2.imwrite(output_png_filename, canvas)
 
@@ -129,7 +136,7 @@ if __name__ == "__main__":
     hand_estimation = Hand(hand_model_file)
 
     if args.input_image:
-        images = [args.input_image]
+        process_image(args.input_image, body_estimation, hand_estimation, args)
     else:
         patterns = args.patterns.split(',')
         for pattern in patterns:

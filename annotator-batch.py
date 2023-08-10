@@ -7,8 +7,6 @@ import glob
 import cv2
 import numpy as np
 
-import hashlib
-
 script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(script_dir)
 sys.path.append(os.path.join(script_dir, 'ControlNet'))
@@ -102,8 +100,6 @@ def uniformer(img):
 def process_image(img_path, args):
     print(f"Processing {img_path}")
     img = cv2.imread(img_path)
-    the_hash = hashlib.md5(img.tobytes()).hexdigest()
-    print(f"Original hash is {the_hash}")
     img = resize_image(HWC3(img), args.resolution)
     
     base_name = os.path.splitext(os.path.basename(img_path))[0]
@@ -111,8 +107,6 @@ def process_image(img_path, args):
     output_name = f"{base_name}_resize{args.resolution}.png"
     cv2.imwrite(os.path.join(output_dir, output_name), img)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    the_hash = hashlib.md5(img.tobytes()).hexdigest()
-    print(f"Resize hash is {the_hash}")
     
     if args.canny:
         result = canny(img, args.canny_low, args.canny_high)

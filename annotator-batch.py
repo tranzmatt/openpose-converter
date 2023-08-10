@@ -8,6 +8,8 @@ import cv2
 import numpy as np
 from ControlNet.annotator.util import resize_image, HWC3
 
+#import hashlib
+
 script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(script_dir)
 sys.path.append(os.path.join(script_dir, 'ControlNet'))
@@ -88,6 +90,8 @@ def midas(img, a):
 
 
 def openpose(img, has_hand):
+    #the_hash = hashlib.md5(img.tobytes()).hexdigest()
+    #print(f"openpose() The hash {the_hash}")
     global model_openpose
     if model_openpose is None:
         from ControlNet.annotator.openpose import OpenposeDetector
@@ -107,8 +111,13 @@ def uniformer(img):
 
 def process_image(img_path, args, detector):
     print(f"Processing {img_path}")
+    result = None
     img = cv2.imread(img_path)
+    #print(f"Original dimensions of {img_path}: {img.shape}")
     img = resize_image(HWC3(img), args.resolution)
+    #the_hash = hashlib.md5(img.tobytes()).hexdigest()
+    #print(f"Resized dimensions of {img_path}: {img.shape}")
+    #print(f"Resized hash {the_hash}")
 
     base_name = os.path.splitext(os.path.basename(img_path))[0]
     output_dir = os.path.dirname(img_path)
@@ -134,6 +143,11 @@ def process_image(img_path, args, detector):
         cv2.imwrite(os.path.join(output_dir, output_name), result)
     
     elif detector == "openpose":
+        #print(f"Running Openpose")
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        #the_hash = hashlib.md5(img.tobytes()).hexdigest()
+        #print(f"process_image openpose The hash {the_hash}")
+
         result = openpose(img, args.pose_hand)
         result = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
     
